@@ -242,8 +242,11 @@
   <div class="toast" id="toast"></div>
 
   <script>
+   // ===== 默认规格：首次进入游戏时使用的方格大小 =====
+  // 取值范围 3 ~ 10，对应 3*3 ~ 10*10；如需修改初始规格，改这里即可
+  //（下方"设置"弹层里的下拉菜单也会默认选中该值）
     const state = {
-      size: 5,
+      size: 3,
       correctMode: 'hide', // 'hide' | 'keep'
       order: 'asc', // 'asc' | 'desc'
       numbers: [],
@@ -336,7 +339,7 @@
           clearInterval(state.timerId);
           const spent = Date.now() - state.startTime;
           targetText.textContent = '目标：完成';
-          setTimeout(() => showToast(`完成！用时 ${fmtTime(spent)}`), 300);
+          setTimeout(() => showToast(`完成！用时 ${fmtTime(spent)}`), 600);
         } else {
           state.nextTarget = state.orderList[nextIdx];
           targetText.textContent = '目标：' + state.nextTarget;

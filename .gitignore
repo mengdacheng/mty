@@ -1,0 +1,12 @@
+.idea
+composer.lock
+*.log
+*.css.map
+!.gitkeep
+.env
+.svn
+.vscode
+.bat
+node_modules
+.user.ini
+*.skill

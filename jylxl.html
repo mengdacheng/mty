@@ -18,6 +18,7 @@
       touch-action: manipulation;
     }
     .header {
+      position: relative;
       width: 100%;
       max-width: 560px;
       display: flex;
@@ -25,7 +26,7 @@
       align-items: center;
       margin: 8px 0 16px;
     }
-    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; }
+    h1 { font-size: 2.0rem; font-weight: 700; letter-spacing: 2px; position: absolute; left: 50%; transform: translateX(-50%); }
     .btn {
       background: #fff;
       border: 2px solid #0f7b0f;
@@ -171,10 +172,64 @@
       text-align: center;
     }
     .toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+
+    /* 重新测试左侧的游戏切换选框（点击向上展开，不悬浮） */
+    .game-switch {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .switch-trigger {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 14px;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+    .switch-trigger:hover { background: #0f7b0f; color: #fff; }
+    .switch-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 300;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+      background: #f6fff6;
+      border: 2px solid #0f7b0f;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.18);
+    }
+    .game-switch.open .switch-menu { display: flex; }
+    .switch-item {
+      text-decoration: none;
+      color: #0f7b0f;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .switch-item:hover { background: #0f7b0f; color: #fff; }
+    .switch-item.current { background: #d4f6d4; }
   </style>
 </head>
 <body>
   <div class="header">
+    <div class="game-switch" id="gameSwitch">
+      <button class="switch-trigger" id="switchTrigger">游戏切换 ▼</button>
+      <div class="switch-menu" id="switchMenu">
+        <a class="switch-item" href="setfg.html">舒尔特方格</a>
+        <a class="switch-item" href="setfg-zm.html">舒尔特方格(字母)</a>
+        <a class="switch-item" href="jylxl.html">记忆力训练</a>
+      </div>
+    </div>
     <h1>记忆力训练</h1>
     <button class="btn" id="settingsBtn">设置</button>
   </div>
@@ -439,6 +494,21 @@
     buildQtyOptions();
     syncQtyDisabled();
     startGame();
+
+    // ===== 底部居左游戏切换选框 =====
+    const gameSwitch = document.getElementById('gameSwitch');
+    const switchTrigger = document.getElementById('switchTrigger');
+    switchTrigger.addEventListener('click', () => {
+      gameSwitch.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!gameSwitch.contains(e.target)) gameSwitch.classList.remove('open');
+    });
+    const curPage = location.pathname.split('/').pop();
+    document.querySelectorAll('.switch-item').forEach((a) => {
+      if (a.getAttribute('href') === curPage) a.classList.add('current');
+      a.addEventListener('click', () => gameSwitch.classList.remove('open'));
+    });
   </script>
 </body>
 </html>

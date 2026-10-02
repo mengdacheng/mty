@@ -18,6 +18,7 @@
       touch-action: manipulation;
     }
     .header {
+      position: relative;
       width: 100%;
       max-width: 560px;
       display: flex;
@@ -25,7 +26,7 @@
       align-items: center;
       margin: 8px 0 16px;
     }
-    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; }
+    h1 { font-size: 2.0rem; font-weight: 700; letter-spacing: 2px; position: absolute; left: 50%; transform: translateX(-50%); }
     .btn {
       background: #fff;
       border: 2px solid #0f7b0f;
@@ -94,6 +95,50 @@
     .cell.mem-hidden { cursor: pointer; border-style: dashed; opacity: 1; background: #fff; }
     .cell.mem-hidden.correct-flash { animation: flashGreen .35s ease; }
     .cell.mem-hidden.wrong-flash { animation: flashOrange .35s ease; }
+    .game-switch {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .switch-trigger {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .switch-trigger:hover { background: #0f7b0f; color: #fff; }
+    .switch-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 300;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+      background: #f6fff6;
+      border: 2px solid #0f7b0f;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.18);
+    }
+    .switch-menu.show { display: flex; }
+    .switch-item {
+      display: block;
+      text-decoration: none;
+      color: #0f7b0f;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .switch-item:hover { background: #d4f6d4; }
+    .switch-item.current { background: #d4f6d4; font-weight: 700; }
     .footer {
       width: 100%;
       max-width: 560px;
@@ -197,6 +242,14 @@
 </head>
 <body>
   <div class="header">
+    <div class="game-switch" id="gameSwitch">
+      <button class="switch-trigger" id="switchTrigger">游戏切换 ▼</button>
+      <div class="switch-menu" id="switchMenu">
+        <a class="switch-item current" href="setfg.html">舒尔特方格</a>
+        <a class="switch-item" href="setfg-zm.html">舒尔特方格(字母)</a>
+        <a class="switch-item" href="jylxl.html">记忆力训练</a>
+      </div>
+    </div>
     <h1>舒尔特方格</h1>
     <button class="btn" id="settingsBtn">设置</button>
   </div>
@@ -280,6 +333,16 @@
     const closeSettings = document.getElementById('closeSettings');
     const restartBtn = document.getElementById('restartBtn');
     const toast = document.getElementById('toast');
+
+    const switchTrigger = document.getElementById('switchTrigger');
+    const switchMenu = document.getElementById('switchMenu');
+    switchTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchMenu.classList.toggle('show');
+    });
+    document.addEventListener('click', () => {
+      switchMenu.classList.remove('show');
+    });
 
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {

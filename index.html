@@ -18,6 +18,7 @@
       touch-action: manipulation;
     }
     .header {
+      position: relative;
       width: 100%;
       max-width: 560px;
       display: flex;
@@ -25,7 +26,7 @@
       align-items: center;
       margin: 8px 0 16px;
     }
-    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; }
+    h1 { font-size: 2.0rem; font-weight: 700; letter-spacing: 2px; position: absolute; left: 50%; transform: translateX(-50%); }
     .btn {
       background: #fff;
       border: 2px solid #0f7b0f;
@@ -91,6 +92,53 @@
       0%,100% { background: #fff; }
       50% { background: #ffd4a8; }
     }
+    .cell.mem-hidden { cursor: pointer; border-style: dashed; opacity: 1; background: #fff; }
+    .cell.mem-hidden.correct-flash { animation: flashGreen .35s ease; }
+    .cell.mem-hidden.wrong-flash { animation: flashOrange .35s ease; }
+    .game-switch {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .switch-trigger {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .switch-trigger:hover { background: #0f7b0f; color: #fff; }
+    .switch-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 300;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+      background: #f6fff6;
+      border: 2px solid #0f7b0f;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.18);
+    }
+    .switch-menu.show { display: flex; }
+    .switch-item {
+      display: block;
+      text-decoration: none;
+      color: #0f7b0f;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .switch-item:hover { background: #d4f6d4; }
+    .switch-item.current { background: #d4f6d4; font-weight: 700; }
     .footer {
       width: 100%;
       max-width: 560px;
@@ -194,6 +242,14 @@
 </head>
 <body>
   <div class="header">
+    <div class="game-switch" id="gameSwitch">
+      <button class="switch-trigger" id="switchTrigger">游戏切换 ▼</button>
+      <div class="switch-menu" id="switchMenu">
+        <a class="switch-item current" href="setfg.html">舒尔特方格</a>
+        <a class="switch-item" href="setfg-zm.html">舒尔特方格(字母)</a>
+        <a class="switch-item" href="jylxl.html">记忆力训练</a>
+      </div>
+    </div>
     <h1>舒尔特方格</h1>
     <button class="btn" id="settingsBtn">设置</button>
   </div>
@@ -217,6 +273,13 @@
       <div class="form-row">
         <label class="form-label" for="sizeSelect">规格</label>
         <select class="select" id="sizeSelect"></select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">选项</span>
+        <div class="radio-group">
+          <label><input type="radio" name="mode" value="show" checked><span>展示</span></label>
+          <label><input type="radio" name="mode" value="hide"><span>隐藏</span></label>
+        </div>
       </div>
       <div class="form-row">
         <span class="form-label">数字正确</span>
@@ -247,12 +310,15 @@
   //（下方"设置"弹层里的下拉菜单也会默认选中该值）
     const state = {
       size: 3,
+      mode: 'show', // 'show' | 'hide'
       correctMode: 'hide', // 'hide' | 'keep'
       order: 'asc', // 'asc' | 'desc'
       numbers: [],
       nextTarget: null,
       startTime: 0,
       timerId: null,
+      countdownId: null,
+      active: false,
       finished: false,
       orderList: []
     };
@@ -267,6 +333,16 @@
     const closeSettings = document.getElementById('closeSettings');
     const restartBtn = document.getElementById('restartBtn');
     const toast = document.getElementById('toast');
+
+    const switchTrigger = document.getElementById('switchTrigger');
+    const switchMenu = document.getElementById('switchMenu');
+    switchTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchMenu.classList.toggle('show');
+    });
+    document.addEventListener('click', () => {
+      switchMenu.classList.remove('show');
+    });
 
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
@@ -297,10 +373,10 @@
         const cell = document.createElement('div');
         cell.className = 'cell';
         const num = state.numbers[i];
+        cell.dataset.index = i;
+        cell.addEventListener('click', onCellClick);
         if (num !== null) {
           cell.textContent = num;
-          cell.dataset.index = i;
-          cell.addEventListener('click', onCellClick);
         } else {
           cell.classList.add('empty');
         }
@@ -308,20 +384,39 @@
       }
     }
 
+    // 隐藏模式下，倒计时结束后把所有未完成的格子内容隐藏（仅留可点击的虚线格）
+    function hideAllCells() {
+      const cells = grid.children;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        if (state.numbers[i] === null) continue;
+        if (cell.classList.contains('finished')) continue;
+        cell.textContent = '';
+        cell.classList.remove('correct-flash', 'wrong-flash');
+        cell.classList.add('mem-hidden');
+      }
+    }
+
     function onCellClick(e) {
-      if (state.finished) return;
+      if (state.finished || !state.active) return;
       const cell = e.currentTarget;
       const idx = Number(cell.dataset.index);
       const num = state.numbers[idx];
       if (num === null) return;
+      if (cell.classList.contains('finished')) return;
 
       if (num === state.nextTarget) {
-        cell.classList.remove('wrong-flash');
+        cell.classList.remove('mem-hidden', 'wrong-flash');
+        cell.textContent = num;
         void cell.offsetWidth;
         cell.classList.add('correct-flash');
         setTimeout(() => cell.classList.remove('correct-flash'), 360);
 
-        if (state.correctMode === 'hide') {
+        if (state.mode === 'hide') {
+          // 隐藏模式：选对才显示，背景变浅绿色
+          cell.classList.add('finished');
+          cell.style.pointerEvents = 'none';
+        } else if (state.correctMode === 'hide') {
           state.numbers[idx] = null;
           setTimeout(() => {
             cell.textContent = '';
@@ -345,16 +440,30 @@
           targetText.textContent = '目标：' + state.nextTarget;
         }
       } else {
-        cell.classList.remove('correct-flash');
-        void cell.offsetWidth;
-        cell.classList.add('wrong-flash');
-        setTimeout(() => cell.classList.remove('wrong-flash'), 360);
+        if (state.mode === 'hide') {
+          // 选错：提示正确的那个格子，浅橘色闪烁一次（并显形作为提示）
+          const correctIdx = state.numbers.indexOf(state.nextTarget);
+          const correctCell = grid.children[correctIdx];
+          correctCell.classList.remove('wrong-flash');
+          void correctCell.offsetWidth;
+          correctCell.textContent = state.numbers[correctIdx];
+          correctCell.classList.remove('mem-hidden');
+          correctCell.classList.add('wrong-flash');
+          setTimeout(() => correctCell.classList.remove('wrong-flash'), 360);
+        } else {
+          cell.classList.remove('correct-flash');
+          void cell.offsetWidth;
+          cell.classList.add('wrong-flash');
+          setTimeout(() => cell.classList.remove('wrong-flash'), 360);
+        }
       }
     }
 
     function initGame() {
       state.finished = false;
+      state.active = false;
       clearInterval(state.timerId);
+      if (state.countdownId) { clearInterval(state.countdownId); state.countdownId = null; }
 
       const total = state.size * state.size;
       state.orderList = [];
@@ -366,11 +475,35 @@
       state.nextTarget = state.orderList[0];
 
       state.numbers = shuffle(state.orderList.slice());
-      state.startTime = Date.now();
+      renderGrid();
       targetText.textContent = '目标：' + state.nextTarget;
       timerText.textContent = '时间：0.0s';
-      state.timerId = setInterval(updateTimer, 100);
-      renderGrid();
+
+      if (state.mode === 'hide') {
+        // 先全部展示，右上角倒计时 3 秒，结束后隐藏所有格子
+        targetText.textContent = '记住位置！';
+        let count = 3;
+        timerText.textContent = '记忆 ' + count;
+        state.countdownId = setInterval(() => {
+          count--;
+          if (count > 0) {
+            timerText.textContent = '记忆 ' + count;
+          } else {
+            clearInterval(state.countdownId);
+            state.countdownId = null;
+            hideAllCells();
+            state.active = true;
+            state.startTime = Date.now();
+            timerText.textContent = '时间：0.0s';
+            state.timerId = setInterval(updateTimer, 100);
+            targetText.textContent = '目标：' + state.nextTarget;
+          }
+        }, 1000);
+      } else {
+        state.active = true;
+        state.startTime = Date.now();
+        state.timerId = setInterval(updateTimer, 100);
+      }
     }
 
     function openSettings() {
@@ -383,8 +516,10 @@
 
     function applySettings() {
       state.size = Number(sizeSelect.value);
+      const md = document.querySelector('input[name="mode"]:checked');
       const cm = document.querySelector('input[name="correctMode"]:checked');
       const od = document.querySelector('input[name="order"]:checked');
+      state.mode = md ? md.value : 'show';
       state.correctMode = cm ? cm.value : 'hide';
       state.order = od ? od.value : 'asc';
       closeModal();
@@ -393,7 +528,7 @@
 
     function buildSizeOptions() {
       sizeSelect.innerHTML = '';
-      for (let n = 3; n <= 10; n++) {
+      for (let n = 2; n <= 10; n++) {
         const opt = document.createElement('option');
         opt.value = n;
         opt.textContent = `${n} × ${n}`;

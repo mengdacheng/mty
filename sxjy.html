@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>记忆力训练</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #e8fbe8;
+      color: #0f7b0f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      touch-action: manipulation;
+    }
+    .header {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0 16px;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; }
+    .btn {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+      user-select: none;
+    }
+    .btn:hover { background: #0f7b0f; color: #fff; }
+    .btn:active { opacity: .85; }
+    .status-bar {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .grid-wrap {
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+    }
+    .grid {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      background: #d4f6d4;
+      border-radius: 18px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.12);
+    }
+    .cell {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* 亮起（演示序列时） */
+    .cell.lit {
+      background: #ffca28;
+      box-shadow: 0 0 16px rgba(255,202,40,.9);
+      transform: scale(1.06);
+    }
+    /* 玩家点对的瞬间反馈 */
+    .cell.confirm {
+      background: #b8f5b8;
+      box-shadow: 0 0 14px rgba(184,245,184,.9);
+    }
+    /* 玩家点错的瞬间反馈 */
+    .cell.wrong {
+      background: #ffd4a8;
+      box-shadow: 0 0 14px rgba(255,212,168,.9);
+    }
+    /* 正确格子“显示”模式下，点对后保持浅绿色背景 */
+    .cell.correct-keep {
+      background: #c8f8c8;
+      border-color: #0f7b0f;
+    }
+    .footer {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-mask.show { display: flex; }
+    .modal {
+      background: #f6fff6;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 360px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      text-align: center;
+      color: #0f7b0f;
+    }
+    .form-row {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #0f7b0f;
+    }
+    .select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 2px solid #0f7b0f;
+      border-radius: 10px;
+      background: #fff;
+      color: #0f7b0f;
+      outline: none;
+      cursor: pointer;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .modal-actions .btn { flex: 1; text-align: center; }
+    .toast {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(.9);
+      background: rgba(15,123,15,.92);
+      color: #fff;
+      padding: 18px 32px;
+      border-radius: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      z-index: 200;
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>记忆力训练</h1>
+    <button class="btn" id="settingsBtn">设置</button>
+  </div>
+
+  <div class="status-bar">
+    <span id="lengthText">长度：1</span>
+    <span id="bestText">最佳：0</span>
+  </div>
+
+  <div class="grid-wrap">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="restartBtn">重新开始</button>
+  </div>
+
+  <div class="modal-mask" id="settingsModal">
+    <div class="modal">
+      <div class="modal-title">游戏设置</div>
+      <div class="form-row">
+        <label class="form-label" for="sizeSelect">规格</label>
+        <select class="select" id="sizeSelect"></select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">数量</span>
+        <div class="radio-group">
+          <label><input type="radio" name="qtyMode" value="inc" checked><span>自增</span></label>
+          <label><input type="radio" name="qtyMode" value="fix"><span>固定</span>
+            <select class="select" id="qtySelect" style="width:64px; padding:4px 6px; font-size:.9rem;"></select>
+          </label>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-label">重复</span>
+        <div class="radio-group">
+          <label><input type="radio" name="repeatMode" value="unique" checked><span>不重复</span></label>
+          <label><input type="radio" name="repeatMode" value="repeat"><span>重复</span></label>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-label">正确格子</span>
+        <div class="radio-group">
+          <label><input type="radio" name="correctShow" value="show" checked><span>显示</span></label>
+          <label><input type="radio" name="correctShow" value="hide"><span>不显示</span></label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="saveSettings">开始游戏</button>
+        <button class="btn" id="closeSettings">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+   // ===== 默认规格：首次进入游戏时使用的方格大小（取值 2 ~ 10）=====
+   // 下方"设置"弹层里的下拉菜单默认选中该值
+    const state = {
+      size: 3,
+      qtyMode: 'inc',   // 'inc' 自增 | 'fix' 固定
+      fixedQty: 1,      // 固定模式下的序列长度
+      repeatMode: 'unique', // 'unique' 不重复（相邻不重复） | 'repeat' 允许重复
+      correctShow: 'show',  // 'show' 点对后保持浅绿 | 'hide' 仅短暂闪烁
+      sequence: [],     // 本轮需要记住的按钮顺序（存储格子下标）
+      inputIndex: 0,    // 玩家当前应点击的序列位置
+      length: 1,        // 当前序列长度（每成功一轮 +1）
+      best: 0,          // 达到过的最大长度
+      accepting: false, // 是否正在等待玩家点击
+      finished: false   // 本轮是否已结束（点错）
+    };
+
+    let timers = [];
+    let toastTimer = null;
+
+    const grid = document.getElementById('grid');
+    const lengthText = document.getElementById('lengthText');
+    const bestText = document.getElementById('bestText');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const sizeSelect = document.getElementById('sizeSelect');
+    const qtySelect = document.getElementById('qtySelect');
+    const saveSettings = document.getElementById('saveSettings');
+    const closeSettings = document.getElementById('closeSettings');
+    const restartBtn = document.getElementById('restartBtn');
+    const toast = document.getElementById('toast');
+
+    function schedule(fn, ms) {
+      const id = setTimeout(fn, ms);
+      timers.push(id);
+      return id;
+    }
+    function clearTimers() {
+      timers.forEach(clearTimeout);
+      timers = [];
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 800);//完成提示框
+    }
+
+    function renderGrid() {
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${state.size}, 1fr)`;
+      grid.style.gridTemplateRows = `repeat(${state.size}, 1fr)`;
+      const total = state.size * state.size;
+      for (let i = 0; i < total; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.index = i;
+        cell.addEventListener('click', onCellClick);
+        grid.appendChild(cell);
+      }
+    }
+
+    function lightCell(idx, ms) {
+      const cell = grid.children[idx];
+      cell.classList.add('lit');
+      schedule(() => cell.classList.remove('lit'), ms);
+    }
+
+    // 生成新序列并开始演示
+    function startRound() {
+      clearTimers();
+      grid.querySelectorAll('.cell.correct-keep').forEach(c => c.classList.remove('correct-keep'));
+      if (state.qtyMode === 'fix') state.length = state.fixedQty;
+      state.sequence = [];
+      let prev = -1;
+      for (let i = 0; i < state.length; i++) {
+        let idx;
+        do {
+          idx = Math.floor(Math.random() * state.size * state.size);
+        } while (state.repeatMode === 'unique' && idx === prev); // 不重复：相邻按钮不重复
+        prev = idx;
+        state.sequence.push(idx);
+      }
+      state.inputIndex = 0;
+      state.accepting = false;
+      state.finished = false;
+      lengthText.textContent = '长度：' + state.length;
+      bestText.textContent = '最佳：' + state.best;
+      playSequence();
+    }
+
+    // 依次亮起序列中的按钮
+    function playSequence() {
+      state.accepting = false;
+      lengthText.textContent = '请记住顺序…';
+      const litMs = 520, gap = 240;
+      let delay = 600;
+      state.sequence.forEach((idx) => {
+        schedule(() => lightCell(idx, litMs), delay);
+        delay += litMs + gap;
+      });
+      schedule(() => {
+        state.accepting = true;
+        lengthText.textContent = '长度：' + state.length + '（轮到你）';
+      }, delay);
+    }
+
+    function onCellClick(e) {
+      if (!state.accepting || state.finished) return;
+      const idx = Number(e.currentTarget.dataset.index);
+      const cell = e.currentTarget;
+
+      if (idx === state.sequence[state.inputIndex]) {
+        cell.classList.add('confirm');
+        schedule(() => cell.classList.remove('confirm'), 300);
+        if (state.correctShow === 'show') cell.classList.add('correct-keep');
+        state.inputIndex++;
+        if (state.inputIndex >= state.length) {
+          // 本轮完成
+          state.accepting = false;
+          if (state.length > state.best) state.best = state.length;
+          bestText.textContent = '最佳：' + state.best;
+          showToast('完成！长度 ' + state.length);
+          if (state.qtyMode === 'inc') state.length++;
+          schedule(startRound, 1000);
+        }
+      } else {
+        // 点错，本轮结束
+        state.accepting = false;
+        state.finished = true;
+        // 回合结束：已点对的格子背景恢复为初始白色
+        grid.querySelectorAll('.cell.correct-keep').forEach(c => c.classList.remove('correct-keep'));
+        cell.classList.add('wrong');
+        schedule(() => cell.classList.remove('wrong'), 400);
+        lengthText.textContent = '长度：' + state.length + '（结束）';
+        showToast('本轮结束，最佳长度 ' + state.best);
+      }
+    }
+
+    function startGame() {
+      clearTimers();
+      renderGrid();
+      state.length = 1;
+      state.best = 0;
+      startRound();
+    }
+
+    function openSettings() { settingsModal.classList.add('show'); }
+    function closeModal() { settingsModal.classList.remove('show'); }
+
+    function applySettings() {
+      state.size = Number(sizeSelect.value);
+      const qm = document.querySelector('input[name="qtyMode"]:checked');
+      state.qtyMode = qm ? qm.value : 'inc';
+      state.fixedQty = Number(qtySelect.value);
+      const rm = document.querySelector('input[name="repeatMode"]:checked');
+      state.repeatMode = rm ? rm.value : 'unique';
+      const cs = document.querySelector('input[name="correctShow"]:checked');
+      state.correctShow = cs ? cs.value : 'show';
+      closeModal();
+      startGame();
+    }
+
+    function buildSizeOptions() {
+      sizeSelect.innerHTML = '';
+      for (let n = 2; n <= 20; n++) {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = `${n} × ${n}`;
+        if (n === state.size) opt.selected = true;
+        sizeSelect.appendChild(opt);
+      }
+    }
+
+    function buildQtyOptions() {
+      qtySelect.innerHTML = '';
+      for (let n = 1; n <= 20; n++) {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = String(n);
+        if (n === state.fixedQty) opt.selected = true;
+        qtySelect.appendChild(opt);
+      }
+    }
+
+    function syncQtyDisabled() {
+      const checked = document.querySelector('input[name="qtyMode"]:checked');
+      const fix = checked && checked.value === 'fix';
+      qtySelect.disabled = !fix;
+      qtySelect.style.opacity = fix ? '1' : '.5';
+    }
+
+    settingsBtn.addEventListener('click', openSettings);
+    saveSettings.addEventListener('click', applySettings);
+    closeSettings.addEventListener('click', closeModal);
+    restartBtn.addEventListener('click', startGame);
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeModal();
+    });
+    document.querySelectorAll('input[name="qtyMode"]').forEach((r) => {
+      r.addEventListener('change', syncQtyDisabled);
+    });
+
+    buildSizeOptions();
+    buildQtyOptions();
+    syncQtyDisabled();
+    startGame();
+  </script>
+</body>
+</html>

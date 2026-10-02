@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>舒尔特方格</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #e8fbe8;
+      color: #0f7b0f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      touch-action: manipulation;
+    }
+    .header {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0 16px;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; }
+    .btn {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+      user-select: none;
+    }
+    .btn:hover { background: #0f7b0f; color: #fff; }
+    .btn:active { opacity: .85; }
+    .status-bar {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .grid-wrap {
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+    }
+    .grid {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      background: #d4f6d4;
+      border-radius: 18px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.12);
+    }
+    .cell {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      color: #0f7b0f;
+      cursor: pointer;
+      transition: transform .08s, opacity .2s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cell:empty { cursor: default; border-style: dashed; opacity: .5; }
+    .cell.correct-flash { animation: flashGreen .35s ease; }
+    .cell.wrong-flash { animation: flashOrange .35s ease; }
+    .cell.finished { border-color: #0f7b0f; background: #c8f8c8; }
+    @keyframes flashGreen {
+      0%,100% { background: #fff; }
+      50% { background: #b8f5b8; }
+    }
+    @keyframes flashOrange {
+      0%,100% { background: #fff; }
+      50% { background: #ffd4a8; }
+    }
+    .footer {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-mask.show { display: flex; }
+    .modal {
+      background: #f6fff6;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 360px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      text-align: center;
+      color: #0f7b0f;
+    }
+    .form-row {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #0f7b0f;
+    }
+    .select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 2px solid #0f7b0f;
+      border-radius: 10px;
+      background: #fff;
+      color: #0f7b0f;
+      outline: none;
+      cursor: pointer;
+    }
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border: 2px solid #0f7b0f;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      color: #0f7b0f;
+      font-weight: 500;
+    }
+    .radio-group input[type="radio"] {
+      accent-color: #0f7b0f;
+      width: 18px; height: 18px;
+    }
+    .radio-group input[type="radio"]:checked + span { font-weight: 700; }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .modal-actions .btn { flex: 1; text-align: center; }
+    .toast {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(.9);
+      background: rgba(15,123,15,.92);
+      color: #fff;
+      padding: 18px 32px;
+      border-radius: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    .hidden { visibility: hidden; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>舒尔特方格</h1>
+    <button class="btn" id="settingsBtn">设置</button>
+  </div>
+
+  <div class="status-bar">
+    <span id="targetText">目标：1</span>
+    <span id="timerText">时间：0.0s</span>
+  </div>
+
+  <div class="grid-wrap">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="restartBtn">重新测试</button>
+  </div>
+
+  <div class="modal-mask" id="settingsModal">
+    <div class="modal">
+      <div class="modal-title">游戏设置</div>
+      <div class="form-row">
+        <label class="form-label" for="sizeSelect">规格</label>
+        <select class="select" id="sizeSelect"></select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">数字正确</span>
+        <div class="radio-group">
+          <label><input type="radio" name="correctMode" value="hide" checked><span>消失</span></label>
+          <label><input type="radio" name="correctMode" value="keep"><span>不消失</span></label>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-label">顺序</span>
+        <div class="radio-group">
+          <label><input type="radio" name="order" value="asc" checked><span>升序</span></label>
+          <label><input type="radio" name="order" value="desc"><span>倒序</span></label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="saveSettings">开始游戏</button>
+        <button class="btn" id="closeSettings">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = {
+      size: 5,
+      correctMode: 'hide', // 'hide' | 'keep'
+      order: 'asc', // 'asc' | 'desc'
+      numbers: [],
+      nextTarget: null,
+      startTime: 0,
+      timerId: null,
+      finished: false,
+      orderList: []
+    };
+
+    const grid = document.getElementById('grid');
+    const targetText = document.getElementById('targetText');
+    const timerText = document.getElementById('timerText');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const sizeSelect = document.getElementById('sizeSelect');
+    const saveSettings = document.getElementById('saveSettings');
+    const closeSettings = document.getElementById('closeSettings');
+    const restartBtn = document.getElementById('restartBtn');
+    const toast = document.getElementById('toast');
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function fmtTime(ms) { return (ms / 1000).toFixed(1) + 's'; }
+
+    function updateTimer() {
+      timerText.textContent = '时间：' + fmtTime(Date.now() - state.startTime);
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1600);
+    }
+
+    function renderGrid() {
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${state.size}, 1fr)`;
+      grid.style.gridTemplateRows = `repeat(${state.size}, 1fr)`;
+
+      for (let i = 0; i < state.size * state.size; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const num = state.numbers[i];
+        if (num !== null) {
+          cell.textContent = num;
+          cell.dataset.index = i;
+          cell.addEventListener('click', onCellClick);
+        } else {
+          cell.classList.add('empty');
+        }
+        grid.appendChild(cell);
+      }
+    }
+
+    function onCellClick(e) {
+      if (state.finished) return;
+      const cell = e.currentTarget;
+      const idx = Number(cell.dataset.index);
+      const num = state.numbers[idx];
+      if (num === null) return;
+
+      if (num === state.nextTarget) {
+        cell.classList.remove('wrong-flash');
+        void cell.offsetWidth;
+        cell.classList.add('correct-flash');
+        setTimeout(() => cell.classList.remove('correct-flash'), 360);
+
+        if (state.correctMode === 'hide') {
+          state.numbers[idx] = null;
+          setTimeout(() => {
+            cell.textContent = '';
+            cell.classList.add('empty');
+            cell.removeEventListener('click', onCellClick);
+          }, 200);
+        } else {
+          cell.classList.add('finished');
+          cell.style.pointerEvents = 'none';
+        }
+
+        const nextIdx = state.orderList.indexOf(state.nextTarget) + 1;
+        if (nextIdx >= state.orderList.length) {
+          state.finished = true;
+          clearInterval(state.timerId);
+          const spent = Date.now() - state.startTime;
+          targetText.textContent = '目标：完成';
+          setTimeout(() => showToast(`完成！用时 ${fmtTime(spent)}`), 300);
+        } else {
+          state.nextTarget = state.orderList[nextIdx];
+          targetText.textContent = '目标：' + state.nextTarget;
+        }
+      } else {
+        cell.classList.remove('correct-flash');
+        void cell.offsetWidth;
+        cell.classList.add('wrong-flash');
+        setTimeout(() => cell.classList.remove('wrong-flash'), 360);
+      }
+    }
+
+    function initGame() {
+      state.finished = false;
+      clearInterval(state.timerId);
+
+      const total = state.size * state.size;
+      state.orderList = [];
+      if (state.order === 'asc') {
+        for (let i = 1; i <= total; i++) state.orderList.push(i);
+      } else {
+        for (let i = total; i >= 1; i--) state.orderList.push(i);
+      }
+      state.nextTarget = state.orderList[0];
+
+      state.numbers = shuffle(state.orderList.slice());
+      state.startTime = Date.now();
+      targetText.textContent = '目标：' + state.nextTarget;
+      timerText.textContent = '时间：0.0s';
+      state.timerId = setInterval(updateTimer, 100);
+      renderGrid();
+    }
+
+    function openSettings() {
+      settingsModal.classList.add('show');
+    }
+
+    function closeModal() {
+      settingsModal.classList.remove('show');
+    }
+
+    function applySettings() {
+      state.size = Number(sizeSelect.value);
+      const cm = document.querySelector('input[name="correctMode"]:checked');
+      const od = document.querySelector('input[name="order"]:checked');
+      state.correctMode = cm ? cm.value : 'hide';
+      state.order = od ? od.value : 'asc';
+      closeModal();
+      initGame();
+    }
+
+    function buildSizeOptions() {
+      sizeSelect.innerHTML = '';
+      for (let n = 3; n <= 10; n++) {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = `${n} × ${n}`;
+        if (n === state.size) opt.selected = true;
+        sizeSelect.appendChild(opt);
+      }
+    }
+
+    settingsBtn.addEventListener('click', openSettings);
+    saveSettings.addEventListener('click', applySettings);
+    closeSettings.addEventListener('click', closeModal);
+    restartBtn.addEventListener('click', initGame);
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeModal();
+    });
+
+    buildSizeOptions();
+    initGame();
+  </script>
+</body>
+</html>

@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>视觉追踪训练</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #e8fbe8;
+      color: #0f7b0f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      touch-action: manipulation;
+    }
+    .header {
+      position: relative;
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin: 8px 0 16px;
+    }
+    h1 {
+      font-size: 2.0rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: calc(100% - 120px);
+      width: max-content;
+    }
+    .btn {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+      user-select: none;
+    }
+    .btn:hover { background: #0f7b0f; color: #fff; }
+    .btn:active { opacity: .85; }
+    .status-bar {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .grid-wrap {
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+    }
+    .track-area {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #d4f6d4;
+      border-radius: 18px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.12);
+      overflow: hidden;
+    }
+    .ball {
+      position: absolute;
+      border-radius: 50%;
+      background: #90a4ae;
+      box-shadow: 0 2px 6px rgba(0,0,0,.18);
+      transition: background .15s, box-shadow .15s, transform .1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* 记忆阶段：高亮的目标小球 */
+    .ball.target {
+      background: #ffca28;
+      box-shadow: 0 0 18px rgba(255,202,40,.95);
+    }
+    /* 指认阶段：点对的目标小球（蓝底白勾） */
+    .ball.selected {
+      background: #1042d6;
+      box-shadow: 0 0 16px rgba(16,66,214,.95);
+    }
+    .ball.selected::after {
+      content: "✓";
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+    /* 指认阶段点错的小球（红底白叉） */
+    .ball.wrong {
+      background: #ef5350;
+      box-shadow: 0 0 16px rgba(239,83,80,.95);
+    }
+    .ball.wrong::after {
+      content: "✗";
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+    /* 选错后揭示的正确小球：仅蓝底，无勾 */
+    .ball.reveal {
+      background: #1042d6;
+      box-shadow: 0 0 16px rgba(16,66,214,.95);
+    }
+    .track-area.identify .ball { cursor: pointer; }
+    .footer {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-mask.show { display: flex; }
+    .modal {
+      background: #f6fff6;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 360px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      text-align: center;
+      color: #0f7b0f;
+    }
+    .form-row {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #0f7b0f;
+    }
+    .form-label .val {
+      float: right;
+      font-weight: 700;
+    }
+    .range {
+      width: 100%;
+      accent-color: #0f7b0f;
+      cursor: pointer;
+    }
+    .select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 2px solid #0f7b0f;
+      border-radius: 10px;
+      background: #fff;
+      color: #0f7b0f;
+      outline: none;
+      cursor: pointer;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .modal-actions .btn { flex: 1; text-align: center; }
+    .toast {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(.9);
+      background: rgba(15,123,15,.92);
+      color: #fff;
+      padding: 18px 32px;
+      border-radius: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      z-index: 200;
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+
+    /* 左下角固定浮动游戏切换选框（菜单向上展开） */
+    .game-switch {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 300;
+    }
+    .switch-trigger {
+      background: #fff;
+      border: 2px solid #0f7b0f;
+      color: #0f7b0f;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 4px 12px rgba(15,123,15,.18);
+    }
+    .switch-trigger:hover { background: #0f7b0f; color: #fff; }
+    .switch-menu {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      z-index: 300;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+      background: #f6fff6;
+      border: 2px solid #0f7b0f;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 6px 18px rgba(15,123,15,.18);
+    }
+    .game-switch.open .switch-menu { display: flex; }
+    .switch-item {
+      display: block;
+      text-decoration: none;
+      color: #0f7b0f;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .switch-item:hover { background: #0f7b0f; color: #fff; }
+    .switch-item.current { background: #d4f6d4; }
+    #phaseText{
+      color: #1042d6;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>视觉追踪训练</h1>
+    <button class="btn" id="settingsBtn">设置</button>
+  </div>
+
+  <div class="status-bar">
+    <span id="phaseText">准备…</span>
+    <span id="infoText">球：8 / 目标：1</span>
+  </div>
+
+  <div class="status-bar stats-bar">
+    <span>正确：<b id="correctText">0</b></span>
+    <span>连续正确：<b id="consecutiveText">0</b></span>
+    <span>错误：<b id="wrongText">0</b></span>
+  </div>
+
+  <div class="grid-wrap">
+    <div class="track-area" id="trackArea"></div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="restartBtn">重新开始</button>
+  </div>
+
+  <div class="game-switch" id="gameSwitch">
+    <button class="switch-trigger" id="switchTrigger">游戏切换 ▲</button>
+    <div class="switch-menu" id="switchMenu">
+      <a class="switch-item" href="setfg.html">舒尔特方格</a>
+      <a class="switch-item" href="setfg-zm.html">舒尔特方格(字母)</a>
+      <a class="switch-item" href="jylxl.html">记忆力训练</a>
+      <a class="switch-item" href="sjzzxl.html">视觉追踪训练</a>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="settingsModal">
+    <div class="modal">
+      <div class="modal-title">游戏设置</div>
+      <div class="form-row">
+        <label class="form-label" for="ballSelect">球数量</label>
+        <select class="select" id="ballSelect"></select>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="targetSelect">目标数量</label>
+        <select class="select" id="targetSelect"></select>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="speedRange">飞行速度 <span class="val" id="speedVal">1.0×</span></label>
+        <input type="range" class="range" id="speedRange" min="1" max="6" step="0.1" value="3">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="timeRange">飞行时间 <span class="val" id="timeVal">5秒</span></label>
+        <input type="range" class="range" id="timeRange" min="2" max="20" step="1" value="5">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="sizeRange">球大小 <span class="val" id="sizeVal">1.0×</span></label>
+        <input type="range" class="range" id="sizeRange" min="1" max="3" step="0.1" value="2">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="saveSettings">开始游戏</button>
+        <button class="btn" id="closeSettings">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = {
+      ballCount: 8,     // 屏幕小球总数量（3 ~ 20）
+      targetCount: 1,   // 追踪目标小球个数（1 ~ 5，且 ≤ ballCount）
+      speedFactor: 3,   // 飞行速度系数（1 ~ 6）
+      flightMs: 5000,   // 飞行时间（毫秒）
+      sizeFactor: 2,    // 球大小系数（1 ~ 5，1 为当前默认尺寸）
+      correct: 0,          // 正确局数
+      consecutiveCorrect: 0, // 连续正确局数
+      wrong: 0,             // 错误局数
+      balls: [],        // {el, x, y, vx, vy, r, isTarget, selected}
+      phase: '',        // 'memory' | 'track' | 'identify'
+      accepting: false,
+      finished: false,
+      rafId: null,
+      timers: []
+    };
+
+    const MEMORY_MS = 2500;                 // 记忆目标高亮时长
+    function trackMs() { return state.flightMs; } // 飞行时间由设置决定
+
+    const trackArea = document.getElementById('trackArea');
+    const phaseText = document.getElementById('phaseText');
+    const infoText = document.getElementById('infoText');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const ballSelect = document.getElementById('ballSelect');
+    const targetSelect = document.getElementById('targetSelect');
+    const speedRange = document.getElementById('speedRange');
+    const timeRange = document.getElementById('timeRange');
+    const sizeRange = document.getElementById('sizeRange');
+    const speedVal = document.getElementById('speedVal');
+    const timeVal = document.getElementById('timeVal');
+    const sizeVal = document.getElementById('sizeVal');
+    const saveSettings = document.getElementById('saveSettings');
+    const closeSettings = document.getElementById('closeSettings');
+    const restartBtn = document.getElementById('restartBtn');
+    const toast = document.getElementById('toast');
+    const correctText = document.getElementById('correctText');
+    const consecutiveText = document.getElementById('consecutiveText');
+    const wrongText = document.getElementById('wrongText');
+
+    function updateStats() {
+      correctText.textContent = state.correct;
+      consecutiveText.textContent = state.consecutiveCorrect;
+      wrongText.textContent = state.wrong;
+    }
+
+    function schedule(fn, ms) {
+      const id = setTimeout(fn, ms);
+      state.timers.push(id);
+      return id;
+    }
+    function clearTimers() {
+      state.timers.forEach(clearTimeout);
+      state.timers = [];
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // 生成小球：随机分布、随机运动方向，并随机指定目标球
+    function createBalls() {
+      trackArea.innerHTML = '';
+      trackArea.classList.remove('identify');
+      state.balls = [];
+      const W = trackArea.clientWidth;
+      const H = trackArea.clientHeight;
+      const r = Math.max(13, Math.min(Math.min(W, H) / 18, 24)) * state.sizeFactor;
+      state.r = r;
+      const size = r * 2;
+      const count = state.ballCount;
+      const positions = [];
+      for (let i = 0; i < count; i++) {
+        let x, y, ok = false, tries = 0;
+        do {
+          x = Math.random() * (W - size);
+          y = Math.random() * (H - size);
+          ok = positions.every(p => Math.hypot((p.x + r) - (x + r), (p.y + r) - (y + r)) > size * 1.15);
+          tries++;
+        } while (!ok && tries < 30);
+        positions.push({ x, y });
+        const el = document.createElement('div');
+        el.className = 'ball';
+        el.style.width = el.style.height = size + 'px';
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        const speed = (0.8 + Math.random() * 1.1) * state.speedFactor;
+        const ang = Math.random() * Math.PI * 2;
+        const ball = {
+          el, x, y,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed,
+          r, isTarget: false, selected: false
+        };
+        el.addEventListener('click', () => onBallClick(ball));
+        trackArea.appendChild(el);
+        state.balls.push(ball);
+      }
+      // 随机挑选目标小球
+      const idxs = shuffle([...Array(count).keys()]).slice(0, state.targetCount);
+      idxs.forEach(i => state.balls[i].isTarget = true);
+    }
+
+    // 阶段一：记忆目标
+    function startGame() {
+      clearTimers();
+      if (state.rafId) cancelAnimationFrame(state.rafId);
+      state.rafId = null;
+      state.finished = false;
+      state.accepting = false;
+      createBalls();
+      state.phase = 'memory';
+      phaseText.textContent = '记住高亮的小球！';
+      infoText.textContent = `球：${state.ballCount} / 目标：${state.targetCount}`;
+      state.balls.forEach(b => { if (b.isTarget) b.el.classList.add('target'); });
+      schedule(startTrack, MEMORY_MS);
+    }
+
+    // 阶段二：动态追踪
+    function startTrack() {
+      state.balls.forEach(b => b.el.classList.remove('target'));
+      state.phase = 'track';
+      phaseText.textContent = '小球移动中，请追踪…';
+      animate();
+      schedule(stopTrack, trackMs());
+    }
+
+    function animate() {
+      const W = trackArea.clientWidth;
+      const H = trackArea.clientHeight;
+      const size = state.r * 2;
+      state.balls.forEach(b => {
+        b.x += b.vx;
+        b.y += b.vy;
+        if (b.x < 0) { b.x = 0; b.vx = Math.abs(b.vx); }
+        if (b.x > W - size) { b.x = W - size; b.vx = -Math.abs(b.vx); }
+        if (b.y < 0) { b.y = 0; b.vy = Math.abs(b.vy); }
+        if (b.y > H - size) { b.y = H - size; b.vy = -Math.abs(b.vy); }
+        b.el.style.left = b.x + 'px';
+        b.el.style.top = b.y + 'px';
+      });
+      state.rafId = requestAnimationFrame(animate);
+    }
+
+    // 阶段三：精准指认
+    function stopTrack() {
+      if (state.rafId) cancelAnimationFrame(state.rafId);
+      state.rafId = null;
+      state.phase = 'identify';
+      state.accepting = true;
+      trackArea.classList.add('identify');
+      phaseText.textContent = '点击选出目标小球';
+    }
+
+    function onBallClick(b) {
+      if (state.phase !== 'identify' || state.finished || b.selected) return;
+      if (b.isTarget) {
+        b.selected = true;
+        b.el.classList.add('selected');
+        const allFound = state.balls.filter(x => x.isTarget).every(x => x.selected);
+        if (allFound) {
+          state.finished = true;
+          state.accepting = false;
+          state.correct++;
+          state.consecutiveCorrect++;
+          updateStats();
+          showToast('完成！全部找对 🎉');
+          schedule(startGame, 1800); // 弹窗结束后自动进入下一局
+        }
+      } else {
+        // 点错：挑战失败，标出全部目标
+        state.finished = true;
+        state.accepting = false;
+        b.el.classList.add('wrong');
+        state.balls.forEach(x => { if (x.isTarget) x.el.classList.add('reveal'); });
+        state.wrong++;
+        state.consecutiveCorrect = 0;
+        updateStats();
+        showToast('挑战失败，目标已标出');
+        schedule(startGame, 1800); // 弹窗结束后自动进入下一局
+      }
+    }
+
+    function openSettings() { settingsModal.classList.add('show'); }
+    function closeModal() { settingsModal.classList.remove('show'); }
+
+    function applySettings() {
+      let bc = Math.max(3, Math.min(20, Number(ballSelect.value) || 8));
+      let tc = Math.max(1, Math.min(5, Number(targetSelect.value) || 1));
+      if (tc > bc) tc = bc;
+      state.ballCount = bc;
+      state.targetCount = tc;
+      state.speedFactor = Number(speedRange.value) || 1;
+      state.flightMs = (Number(timeRange.value) || 5) * 1000;
+      state.sizeFactor = Number(sizeRange.value) || 1;
+      closeModal();
+      startGame();
+    }
+
+    function buildBallOptions() {
+      ballSelect.innerHTML = '';
+      for (let n = 3; n <= 20; n++) {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = String(n);
+        if (n === state.ballCount) opt.selected = true;
+        ballSelect.appendChild(opt);
+      }
+    }
+
+    function buildTargetOptions() {
+      const max = Math.min(5, state.ballCount);
+      targetSelect.innerHTML = '';
+      for (let n = 1; n <= max; n++) {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = String(n);
+        if (n === state.targetCount) opt.selected = true;
+        targetSelect.appendChild(opt);
+      }
+    }
+
+    settingsBtn.addEventListener('click', openSettings);
+    saveSettings.addEventListener('click', applySettings);
+    closeSettings.addEventListener('click', closeModal);
+    restartBtn.addEventListener('click', () => {
+      state.correct = 0;
+      state.consecutiveCorrect = 0;
+      state.wrong = 0;
+      updateStats();
+      startGame();
+    });
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeModal();
+    });
+    ballSelect.addEventListener('change', () => {
+      // 球数变化时，保证目标数不超过球数
+      let bc = Math.max(3, Math.min(20, Number(ballSelect.value) || 8));
+      if (state.targetCount > bc) state.targetCount = bc;
+      buildTargetOptions();
+    });
+    speedRange.addEventListener('input', () => {
+      speedVal.textContent = Number(speedRange.value).toFixed(1) + '×';
+    });
+    timeRange.addEventListener('input', () => {
+      timeVal.textContent = timeRange.value + '秒';
+    });
+    sizeRange.addEventListener('input', () => {
+      sizeVal.textContent = Number(sizeRange.value).toFixed(1) + '×';
+    });
+
+    buildBallOptions();
+    buildTargetOptions();
+    speedRange.value = state.speedFactor;
+    timeRange.value = state.flightMs / 1000;
+    sizeRange.value = state.sizeFactor;
+    speedVal.textContent = Number(speedRange.value).toFixed(1) + '×';
+    timeVal.textContent = timeRange.value + '秒';
+    sizeVal.textContent = Number(sizeRange.value).toFixed(1) + '×';
+    updateStats();
+    startGame();
+
+    // ===== 左下角浮动游戏切换选框 =====
+    const gameSwitch = document.getElementById('gameSwitch');
+    const switchTrigger = document.getElementById('switchTrigger');
+    switchTrigger.addEventListener('click', () => {
+      gameSwitch.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!gameSwitch.contains(e.target)) gameSwitch.classList.remove('open');
+    });
+    const curPage = location.pathname.split('/').pop();
+    document.querySelectorAll('.switch-item').forEach((a) => {
+      if (a.getAttribute('href') === curPage) a.classList.add('current');
+      a.addEventListener('click', () => gameSwitch.classList.remove('open'));
+    });
+  </script>
+</body>
+</html>
